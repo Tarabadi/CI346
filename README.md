@@ -23,5 +23,5 @@ User: admin
 Password: pass
 ```
 
-####3rd Party Code
+#### 3rd Party Code
 The 5-part blog series "React.js and Spring Data REST" by Greg Turnquist was used to familiarise myself with both react.js and Spring, and is accessable at https://github.com/spring-guides/tut-react-and-spring-data-rest
