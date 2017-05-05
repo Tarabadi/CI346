@@ -17,9 +17,9 @@ class App extends React.Component {
 		super(props);
 		this.state = {employees: [], attributes: [], page: 1, pageSize: 7, links: {}};
 //		this.updatePageSize = this.updatePageSize.bind(this);
-//		this.onCreate = this.onCreate.bind(this);
+		this.onCreate = this.onCreate.bind(this);
 		this.onUpdate = this.onUpdate.bind(this);
-		this.onDelete = this.onDelete.bind(this);
+//		this.onDelete = this.onDelete.bind(this);
 		this.onNavigate = this.onNavigate.bind(this);
 		this.refreshCurrentPage = this.refreshCurrentPage.bind(this);
 		this.refreshAndGoToLastPage = this.refreshAndGoToLastPage.bind(this);
@@ -75,8 +75,20 @@ class App extends React.Component {
 		});
 	}
 
+	// tag::on-create[]
+	onCreate(newEmployee) {
+		follow(client, root, ['employees']).done(response => {
+			client({
+				method: 'POST',
+				path: response.entity._links.self.href,
+				entity: newEmployee,
+				headers: {'Content-Type': 'application/json'}
+			})
+		})
+	}
+	// end::on-create[]
 
-
+	// tag::on-update[]
 	onUpdate(employee, updatedEmployee) {
 		client({
 			method: 'PUT',
@@ -99,21 +111,21 @@ class App extends React.Component {
 			}
 		});
 	}
+	// end::on-update[]
 
-
-
-	onDelete(employee) {
-		client({method: 'DELETE', path: employee.entity._links.self.href}
-		).done(response => {/* let the websocket handle updating the UI */},
-		response => {
-			if (response.status.code === 403) {
-				alert('ACCESS DENIED: You are not authorized to delete ' +
-					employee.entity._links.self.href);
-			}
-		});
-
-	}
-
+//	// tag::on-delete[]
+//	onDelete(employee) {
+//		client({method: 'DELETE', path: employee.entity._links.self.href}
+//		).done(response => {/* let the websocket handle updating the UI */},
+//		response => {
+//			if (response.status.code === 403) {
+//				alert('ACCESS DENIED: You are not authorized to delete ' +
+//					employee.entity._links.self.href);
+//			}
+//		});
+//
+//	}
+//	// end::on-delete[]
 
 	onNavigate(navUri) {
 		client({
@@ -197,9 +209,7 @@ class App extends React.Component {
 	componentDidMount() {
 		this.loadFromServer(this.state.pageSize);
 		stompClient.register([
-			{route: '/topic/newEmployee', callback: this.refreshAndGoToLastPage},
-			{route: '/topic/updateEmployee', callback: this.refreshCurrentPage},
-			{route: '/topic/deleteEmployee', callback: this.refreshCurrentPage}
+			{route: '/topic/updateEmployee', callback: this.refreshCurrentPage}
 		]);
 	}
 	// end::register-handlers[]
@@ -207,7 +217,6 @@ class App extends React.Component {
 	render() {
 		return (
 			<div>
-
 				<EmployeeList page={this.state.page}
 							  employees={this.state.employees}
 							  links={this.state.links}
@@ -218,6 +227,53 @@ class App extends React.Component {
 							  onDelete={this.onDelete}
 //							  updatePageSize={this.updatePageSize}/>
                 />
+			</div>
+		)
+	}
+}
+
+class CreateDialog extends React.Component {
+
+	constructor(props) {
+		super(props);
+		this.handleSubmit = this.handleSubmit.bind(this);
+	}
+
+	handleSubmit(e) {
+		e.preventDefault();
+		var newEmployee = {};
+		this.props.attributes.forEach(attribute => {
+			newEmployee[attribute] = ReactDOM.findDOMNode(this.refs[attribute]).value.trim();
+		});
+		this.props.onCreate(newEmployee);
+		this.props.attributes.forEach(attribute => {
+			ReactDOM.findDOMNode(this.refs[attribute]).value = ''; // clear out the dialog's inputs
+		});
+		window.location = "#";
+	}
+
+	render() {
+		var inputs = this.props.attributes.map(attribute =>
+				<p key={attribute}>
+					<input type="text" placeholder={attribute} ref={attribute} className="field" />
+				</p>
+		);
+		return (
+			<div>
+				<a href="#createEmployee">Create</a>
+
+				<div id="createEmployee" className="modalDialog">
+					<div>
+						<a href="#" title="Close" className="close">X</a>
+
+						<h2>Create new employee</h2>
+
+						<form>
+							{inputs}
+							<button onClick={this.handleSubmit}>Create</button>
+						</form>
+					</div>
+				</div>
 			</div>
 		)
 	}
@@ -251,14 +307,16 @@ class UpdateDialog extends React.Component {
 		);
 
         var third = inputs.shift();
-        inputs.splice(2, 0, third);
+
+        inputs.splice(2,0,third);
+
         //var day = inputs.pop();
 
 		var dialogId = "updateEmployee-" + this.props.employee.entity._links.self.href;
 
 		return (
 			<div>
-				<a href={"#" + dialogId}>Update Rota</a>
+				<a href={"#" + dialogId}>Update</a>
 
 				<div id={dialogId} className="modalDialog">
 					<div>
@@ -268,7 +326,7 @@ class UpdateDialog extends React.Component {
 
 						<form>
 							{inputs}
-							<button onClick={this.handleSubmit}>Update Rota</button>
+							<button onClick={this.handleSubmit}>Update</button>
 						</form>
 					</div>
 				</div>
@@ -321,7 +379,7 @@ class EmployeeList extends React.Component {
 
 	render() {
 		var pageInfo = this.props.page.hasOwnProperty("number") ?
-			<h3>Shift Rota - Page {this.props.page.number + 1} of {this.props.page.totalPages}</h3> : null;
+			<h3>Shift Rota</h3> : null;
 
 		var employees = this.props.employees.map(employee =>
 			<Employee key={employee.entity._links.self.href}
@@ -355,7 +413,6 @@ class EmployeeList extends React.Component {
 							<th>First Shift (00:00 - 08:00)</th>
 							<th>Second Shift (08:00 - 16:00)</th>
 							<th>Third Shift (16:00 - 00:00)</th>
-							<th></th>
 							<th></th>
 						</tr>
 						{employees}
@@ -392,9 +449,6 @@ class Employee extends React.Component {
 					<UpdateDialog employee={this.props.employee}
 								  attributes={this.props.attributes}
 								  onUpdate={this.props.onUpdate}/>
-				</td>
-				<td>
-					<button onClick={this.handleDelete}>Delete</button>
 				</td>
 			</tr>
 		)
